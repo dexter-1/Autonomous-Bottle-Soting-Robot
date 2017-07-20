@@ -1,5 +1,5 @@
 # Autonomous Bottle Sorting Robot Project
-This robot was designed to sort bottles of four different categories:
+The goal of this project is to enhance the recycling process by building a robot to autonomously sort bottles of different types. This robot was programmed in C using a PIC18F4620 Microcontroller. This robot was designed to sort bottles of four different categories:
  * Transparent Water Bottle with a Cap
  * Transparent Water Bottle without a Cap
  * Yoplait Yogurt bottle with a Cap
@@ -9,4 +9,4 @@ To sort the bottles, all the bottles are placed in a loading mechanism. The star
 
 Once sorting has completed, the user can navigate the User Interface to see how long the sorting took and the number of bottles of each type of bottle. The user also has the option to store the information of this run to be viewed for later
 
-The code execute by the robot can be found in `main.c`.
+The code execute by the robot can be found in `main.c`. 
