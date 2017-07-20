@@ -7,4 +7,6 @@ This robot was designed to sort bottles of four different categories:
 
 To sort the bottles, all the bottles are placed in a loading mechanism. The start button is pressed and the bottles are placed one by one onto a sorting tube. A break beam sensor passing through the body of the bottle is used to classify whether the bottle is transparent or not. Proximity sensors strategically placed at both ends of the bottle to sense for a cap. If nothing is detected at either one of the ends of the bottle, this means that there is no cap on the bottle. Otherwise, there is a cap on the bottle. After this a motor rotates a platform to place the correct bin underneath the sorting tube.
 
+Once sorting has completed, the user can navigate the User Interface to see how long the sorting took and the number of bottles of each type of bottle. The user also has the option to store the information of this run to be viewed for later
+
 The code execute by the robot can be found in `main.c`.
