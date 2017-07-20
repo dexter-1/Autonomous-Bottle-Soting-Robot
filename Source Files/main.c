@@ -14,7 +14,7 @@
 //#include "I2C.h"
 
 //global variables
-const char keys[] = "123A456B789C*0#D"; 
+const char keys[] = "123A456B789C*0#D";
 unsigned char totalNumOfBottles = 0;
 unsigned char YopNoCap = 0;
 unsigned char YopCap = 0;
@@ -23,7 +23,7 @@ unsigned char EskaNoCap = 0;
 const char inputTime[7] = {  0x00, //Second
                             0x49, //Minute
                             0x05, //Hour
-                            0x03, //Day of the Week 
+                            0x03, //Day of the Week
                             0x28, //Day
                             0x3, //Month
                             0x17};//Year
@@ -36,7 +36,7 @@ int count = 0;
 int totalCount = 0;
 
 void main(void) {
-    /* pin assignments:
+    /* pin assignments on the PIC Board:
      * RA2:RA5 - middle stepper motor - output
      * RC5:RC7,RC2 - bottom stepper motor - output
      * RD0 - signal to turn on top DC motor - output
@@ -44,20 +44,20 @@ void main(void) {
      * RA4 - transparency check - input
      * RB0,RB2 - cap check - input
      */
-    
-    TRISA = 0b00000011;  //RA0,RA1 input, RA4,RA5 output
+
+    TRISA = 0b00000011;  //set RA0,RA1 input, RA4,RA5 output
     TRISC = 0b01000000;   //all output mode except RC6
     TRISD = 0x00;   //All output mode
     TRISB = 0b11110111;   //Set keypad pins as input, RB0 as input, RB2 as input
     TRISE = 0x00;
-    
+
     //initialize pins to 0
     LATA = 0x00;
-    LATB = 0x00; 
+    LATB = 0x00;
     LATC = 0x00;
     LATD = 0x00;
-    
-//    //setting up interrupt timer
+
+//    //setting up interrupt timer. Uncomment and execute once to set time on display, then comment out
 //    T0CS = 0; //Set timer0 to use internal clock
 //    T0SE = 0; //count on rising edge
 //    PSA = 0;
@@ -65,21 +65,21 @@ void main(void) {
 //    T0PS1 = 1;
 //    T0PS0 = 1; //max prescaler
 //    TMR0IE = 1;
-    
+
     ADCON0 = 0x00;  //Disable ADC
-    ADCON1 = 0xFF;  //Set PORTB to be digital instead of analog default 
+    ADCON1 = 0xFF;  //Set PORTB to be digital instead of analog default
     CMCON = 0x07; //set PORTA to digital
-    
+
     nRBPU = 0;
-    //INT1IE = 1; //set up interrupt bit 
+    //INT1IE = 1; //set up interrupt bit
     I2C_Master_Init(10000); //Initialize I2C Master with 100KHz clock
     initLCD(); //initialize LCD
     di();
-    
+
     lcdInst(0b00001100); //turn off the blinking cursor
     //set_time();
     read_time();
-    printf("%02x/%02x/%02x   %02x:%02x", time[6],time[5],time[4],time[2],time[1]);
+    printf("%02x/%02x/%02x   %02x:%02x", time[6],time[5],time[4],time[2],time[1]); //display time onto the UI display
     __lcd_newline();
     if(ReadEE(0,0) != 0xFF) {
         printf("A:Logs   D:Start");
@@ -91,31 +91,12 @@ void main(void) {
     }
     while(1) {
         char key = keypadInterface();
-        if (key == 'D') {
+        if (key == 'D') { //press key D on the keypad to start the operation
             read_time(); //sets timer
             operationMode();
         }
-        else if(key == 'A' && ReadEE(0,0) != 0xFF) {
+        else if(key == 'A' && ReadEE(0,0) != 0xFF) { //press A to view Saved Logs of previous runs
             viewSavedLogs();
-        }
-        else if(key == '1') {
-            turnStepperMotor2(180);
-        }
-        else if(key == '4') {
-            turnStepperMotor2(-180);
-        }
-        //test code for stepper motor
-        else if(key == '2') {
-            turnStepperMotor1(90);
-        }
-        else if(key == '5') {
-            turnStepperMotor1(180);
-        }
-        else if(key == '8') {
-            turnStepperMotor1(270);
-        }
-        else if(key == '0') {
-            turnStepperMotor1(0);
         }
         else if(key == '6') {
             LATDbits.LATD0 = 1;
@@ -125,29 +106,6 @@ void main(void) {
         }
 
     }
-//    unsigned char prevMins = time[1];
-//    while(1) {
-//        read_time();
-//        if(prevMins != time[1]) {
-//            __lcd_clear();
-//            __delay_ms(1);
-//            printf("%02x/%02x/%02x   %02x:%02x", time[6],time[5],time[4],time[2],time[1]);
-//            __lcd_newline();
-//            if(ReadEE(0,0) != 0xFF) {
-//                printf("2:Logs   1:Start");
-//                __lcd_newline();
-//            }
-//            else if(ReadEE(0,0) == 0xFF) {
-//                printf("         1:Start");
-//                __lcd_newline();
-//            }
-//        }
-//        prevMins = time[1];
-//        __delay_ms(1000);
-//    }
-    //unsigned int prevMinutes = time[1];
-    //standby mode
-    
     return;
 }
 
@@ -157,29 +115,29 @@ void operationMode(void) {
     __delay_ms(1);
     printf(" ..Now Sorting..");
     __lcd_newline();
-    
+
     //Sorting has begun
     LATDbits.LATD0 = 1; //turn on top motor (motor is controlled by pin RD0)
-    
+
     int bottleIdentity;
     int rotationAngle;
-    
-    //code to sort bottles 
+
+    //code to sort bottles
     while(totalNumOfBottles < 10) { //termination condition
         if(PORTAbits.RA1 == 0) {
             LATDbits.LATD0 = 0; //turn off loading motor
             __delay_ms(500); //delay to allow the bottle to fall and align with the sensors
             bottleIdentity = bottleIdentifier(); //bottle identification
             rotationAngle = rotationAmount(bottleIdentity); //determine rotation amount
-            turnStepperMotor1(rotationAngle); //turn bottom motor
-            turnStepperMotor2(-270); //open sensor tube
-            turnStepperMotor2(270); //close sensor tube
+            turnBottomMotor(rotationAngle); //turn bottom motor
+            turnStepperMotor(-270); //open sensor tube
+            turnStepperMotor(270); //close sensor tube
             LATDbits.LATD0 = 1; //turn on loading motor
         }
     }
     //if we get here, sorting has completed
-    
-    
+
+
     di();
     set_final_time(); //stop the timer
     terminationMode();
@@ -205,7 +163,7 @@ int bottleIdentifier(void) {
             return 0;
         }
     }
-    else if(PORTAbits.RA0 == 1) { //break beam sensor: this is the transparent case 
+    else if(PORTAbits.RA0 == 1) { //break beam sensor: this is the transparent case
         if(PORTBbits.RB0 | PORTBbits.RB2 == 1) {
             EskaNoCap++;
             return 3;
@@ -217,28 +175,8 @@ int bottleIdentifier(void) {
     }
 }
 
-//int rotationAmount(int bottleIdentity) {
-//    int newBinPosition;
-//    int rotation;
-//    if(binAssigned(bins,bottleIdentity) == 0) {
-//        newBinPosition = findClosestBin(bins);
-//        bins[newBinPosition] = bottleIdentity;
-//    }
-//    else {
-//        newBinPosition = findAssignedBin(bins,bottleIdentity);
-//    }
-//    rotation = newBinPosition - currentBinPosition;
-//    currentBinPosition = newBinPosition;
-////    if(abs(rotation) == 3) {
-////        return ((rotation % 2)*90*-1);
-////    }
-////    else {
-////        return rotation*90;
-////    }
-//    return abs(rotation*90);
-//}
-
 int rotationAmount(int bottleIdentity) {
+	//this function is used to determine how much to rotate bottom platform based on the identity of bottle
     int counter = 0;
     while(bins[currentBinPosition] != bottleIdentity) {
         if(currentBinPosition == 3) {
@@ -252,55 +190,6 @@ int rotationAmount(int bottleIdentity) {
     return counter*90;
 }
 
-//int binAssigned(int bins[], int bottleIdentity) {
-//    for(unsigned int i = 0; i < 4; i++) {
-//        if(bins[i] == bottleIdentity) 
-//            return 1;
-//    }
-//    return 0;
-//}
-
-//int findAssignedBin(int bins[], int bottleIdentity) {
-//    for(unsigned int i = 0; i < 4; i++) {
-//        if(bins[i] == bottleIdentity) 
-//            return i;
-//    }
-//    return -1;
-//}
-//
-//int findClosestBin(int bins[]) {
-//    int closestBin;
-//    int distance = 4;
-//    int temp;
-//    for(unsigned int i = 0; i < 4; i++) {
-//        if(bins[i] == -1) {
-//            temp = abs(currentBinPosition - i);
-//            if(temp == 3) {
-//                if(distance > 1) {
-//                    distance = 1;
-//                    closestBin = i;
-//                }      
-//            }
-//            else {
-//                if (temp < distance) {
-//                    distance = temp;
-//                    closestBin = i;
-//                }
-//            }
-//        }
-//    }
-//    return closestBin;
-//}
-//
-//int abs(int value) {
-//    if(value > 0) {
-//        return value;
-//    }
-//    else {
-//        return value*-1;
-//    }
-//}
-//
 float fabs(float value) {
     if(value > 0) {
         return value;
@@ -340,24 +229,10 @@ void terminationMode(void) {
         sortLog[12] = EskaNoCap;
         retrieveLog(0,sortLog);
     }
-    //unsigned char key;
-//    while(1) {
-//        for(char k = 0; k < 21; k++) {
-//            __lcd_shiftL();
-//            __delay_ms(250);
-//        }//key = keypadInterface();
-//        __lcd_clear();
-//        __delay_ms(1);
-//        printf(" Sorting Complete! Retrieve bins below");
-//        __lcd_newline();
-//        printf("Press C to show sorting log ");
-//        __delay_halfs();
-//    }
-//    di();
 }
 
 void retrieveLog(int mode, unsigned char sortLog[]) {
-    int log = 0, newlog = 0; 
+    int log = 0, newlog = 0;
     //log is a variable, with values 0-6, with each value displaying a certain piece of information
     //sortLog[] is an array that contains all the information from the run
     unsigned char key; //which key is pressed?
@@ -365,9 +240,9 @@ void retrieveLog(int mode, unsigned char sortLog[]) {
     __delay_halfs();
     while(1) {
         if(newlog != log) {
-            sortingLog(newlog,sortLog,mode); 
+            sortingLog(newlog,sortLog,mode);
         }
-        log = newlog; 
+        log = newlog;
         key = keypadInterface(); //which key is pressed?
         if(key == 'C' && newlog < 6) {
             newlog++; //if C is pressed, move to the next piece of information
@@ -407,6 +282,8 @@ void retrieveLog2(int mode, unsigned char sortLog[]) {
 }
 
 void sortingLog(int log, unsigned char sortLog[], int mode) {
+	//this is the navigation menu after execution has completed
+	//user can see how much time the sorting took and number of each type of Bottle
     switch(log) {
         case(0):
             __lcd_clear();
@@ -445,7 +322,7 @@ void sortingLog(int log, unsigned char sortLog[], int mode) {
         break;
         case(5):
             __lcd_clear();
-            __delay_ms(1); 
+            __delay_ms(1);
             printf(" Eska no cap:%d", sortLog[12]);//sortLog[12] contains total of number of Eska without Cap
             __lcd_newline();
             printf("B:Back    C:Next");
@@ -455,6 +332,7 @@ void sortingLog(int log, unsigned char sortLog[], int mode) {
 }
 
 unsigned char ReadEE(unsigned char addressh, unsigned char address) {
+	//read data from permanent memory
     EEADRH = addressh;
     EEADR = address;
     EECON1bits.EEPGD = 0;
@@ -464,6 +342,7 @@ unsigned char ReadEE(unsigned char addressh, unsigned char address) {
 }
 
 void WriteEE(unsigned char addressh, unsigned char address, unsigned char data) {
+	//write data onto permanent memory so that user can see previous runs
     EECON1bits.WREN = 1; //enable writes
     EEADRH = addressh; //upper bits of data address
     EEADR = address; //lower bits of data address
@@ -471,12 +350,12 @@ void WriteEE(unsigned char addressh, unsigned char address, unsigned char data) 
     EECON1bits.EEPGD = 0; //point to DATA memory
     EECON1bits.CFGS = 0; //access EEPROM
     INTCONbits.GIE = 0; //disable interrupts
-    
+
     //required sequence
     EECON2 = 0x55;
     EECON2 = 0xAA;
-    EECON1bits.WR = 1; //Set WR bit to begin write 
-    
+    EECON1bits.WR = 1; //Set WR bit to begin write
+
     INTCONbits.GIE = 1; //enable interrupts
     while (EECON1bits.WR == 1) {} //waiting for write to complete
     EECON1bits.WREN = 0; //disable writes on write complete
@@ -487,7 +366,7 @@ void saveLog(unsigned char sortLog[]) {
     unsigned char addressh, addressl;
     while(ReadEE(((address >> 8) & 0xFF), (address & 0xFF)) != 0xFF) {
         address += 13;
-    } //look for a byte of memory that is unwritten to 
+    } //look for a byte of memory that is unwritten to
     __lcd_clear();
     for(unsigned int i = 0; i < 13; i++) {
         addressh = (address >> 8) & 0xFF;
@@ -548,7 +427,7 @@ void viewSavedLogs(void) {
 }
 
 char keypadInterface(void) {
-    while(PORTBbits.RB1 == 0){ 
+    while(PORTBbits.RB1 == 0){
             // RB1 is the interrupt pin, so if there is no key pressed, RB1 will be 0
             // the PIC will wait and do nothing until a key press is signaled
     }
@@ -562,43 +441,8 @@ char keypadInterface(void) {
     return temp;
 }
 
-//void turnStepperMotor1(int angle) {
-//    //black, red, yellow, white (clockwise)
-//    float factor; 
-//    float rotation;
-//    float temp;
-//    temp = angle;
-//    factor = temp/360;
-//    rotation = fabs(12*factor);//fabs(1040*factor);
-//    unsigned int i = 0; 
-//    while(i < rotation) {
-//        if(angle >= 0) {
-//            //rotate clockwise
-//            LATC = 0b10000000;//LATC = 0b11000000;
-//            __delay_ms(10);
-//            LATC = 0b01000000;//LATC = 0b01100000;
-//            __delay_ms(10);
-//            LATC = 0b00100000;//LATC = 0b00100100;
-//            __delay_ms(10);
-//            LATC = 0b00000100;//LATC = 0b10000100;
-//            __delay_ms(10);
-//        } 
-//        else {
-//            //rotate counterclockwise 
-//            LATC = 0b00000100;//LATC = 0b10000100;
-//            __delay_ms(10);
-//            LATC = 0b00100000;//LATC = 0b00100100;
-//            __delay_ms(10);
-//            LATC = 0b01000000;//LATC = 0b01100000;
-//            __delay_ms(10);
-//            LATC = 0b10000000;//LATC = 0b11000000;
-//            __delay_ms(10);
-//        }
-//        i++;
-//    }
-//}
-
-void turnStepperMotor1(int angle) {
+void turnBottomMotor(int angle) {
+	//code used to rotate DC motor and correct bin underneath sorting tube
     int counter;
     counter = angle / 90;
     if(counter == 0) {
@@ -622,28 +466,29 @@ void turnStepperMotor1(int angle) {
 }
 
 
-void turnStepperMotor2(int angle) {
-    float factor; 
+void turnStepperMotor(int angle) {
+	//code used to turn stepper motor, allowing bottle to fall from sorting tube into the bin
+    float factor;
     float rotation;
     float temp;
     temp = angle;
     factor = temp/360;
     rotation = fabs(512*factor);
-    unsigned int i = 0; 
+    unsigned int i = 0;
     while(i < rotation) {
         if(angle >= 0) {
-            //rotate clockwise
+            //execute stepping sequence to rotate clockwise
             LATA = 0b00110000;
-            __delay_us(1500); 
+            __delay_us(1500);
             LATA = 0b00011000;
             __delay_us(1500);
             LATA = 0b00001100;
             __delay_us(1500);
             LATA = 0b00100100;
             __delay_us(1500);
-        } 
+        }
         else {
-            //rotate counterclockwise 
+            //execute stepping sequence to rotate counterclockwise
             LATA = 0b00100100;
             __delay_us(1500);
             LATA = 0b00001100;
@@ -663,19 +508,19 @@ void set_time(void){
     I2C_Master_Write(0x00); //Set memory pointer to seconds
     for(char i=0; i<7; i++){
         I2C_Master_Write(inputTime[i]);
-    }    
-    I2C_Master_Stop(); //Stop condition 
+    }
+    I2C_Master_Stop(); //Stop condition
 }
 
 void read_time(void) {
-    //Reset RTC memory pointer 
+    //Reset RTC memory pointer
     I2C_Master_Start(); //Start condition
     I2C_Master_Write(0b11010000); //7 bit RTC address + Write
     I2C_Master_Write(0x00); //Set memory pointer to seconds
     I2C_Master_Stop(); //Stop condition
-    
+
     //Read Current Time
-    I2C_Master_Start(); 
+    I2C_Master_Start();
     I2C_Master_Write(0b11010001); //7 bit RTC address + Read
     for(unsigned char i=0;i<0x06;i++){
         time[i] = I2C_Master_Read(1);
@@ -685,34 +530,35 @@ void read_time(void) {
 }
 
 void set_final_time(void) {
-    //Reset RTC memory pointer 
+    //Reset RTC memory pointer
     I2C_Master_Start(); //Start condition
     I2C_Master_Write(0b11010000); //7 bit RTC address + Write
     I2C_Master_Write(0x00); //Set memory pointer to seconds
     I2C_Master_Stop(); //Stop condition
-    
+
     //Read Current Time
-    I2C_Master_Start(); 
+    I2C_Master_Start();
     I2C_Master_Write(0b11010001); //7 bit RTC address + Read
     for(unsigned char i=0;i<0x06;i++){
         finalTime[i] = I2C_Master_Read(1);
     }
     finalTime[6] = I2C_Master_Read(0);       //Final Read without ack
     I2C_Master_Stop();
-    
+
     calcSortTime();
 }
 
 void calcSortTime(void) {
     unsigned char initialMinutes, finalMinutes;
     unsigned char initialSeconds, finalSeconds;
-    
+
+	//time stored in the Real Time CLock (RTC Module) is in BCD. Need to convert to decimal first
     finalMinutes = (finalTime[1] >> 4)*10 + (finalTime[1] & 0x0F); //convert BCD to decimal number
     finalSeconds = (finalTime[0] >> 4)*10 + (finalTime[0] & 0x0F); //convert BCD to decimal number
-    
+
     initialMinutes = (time[1] >> 4)*10 + (time[1] & 0x0F); //convert BCD to decimal number
     initialSeconds = (time[0] >> 4)*10 + (time[0] & 0x0F); //convert BCD to decimal number
-    
+
     if(finalSeconds < initialSeconds) { //in this case, borrow 1 from the minutes and add 60 to seconds
         finalMinutes = finalMinutes - 1;
         finalSeconds = finalSeconds + 60;
@@ -728,8 +574,8 @@ void calcSortTime(void) {
 void interrupt IRQ_HANDLER(void) {
     if(TMR0IF) { //timer interrupt flag
         TMR0 = 0; //reset TIMER0 register after overflowing
-        count++; //increase count value 
-        if(count == 687) { //count value of 687, corresponding to 3 minutes 
+        count++; //increase count value
+        if(count == 687) { //count value of 687, corresponding to 3 minutes
             di();
             set_final_time();
             terminationMode();
