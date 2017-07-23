@@ -5,11 +5,14 @@
  * Created on July 18, 2016, 12:11 PM
  */
 
+
+ /* =============================================================================
+ This file contains the functions dealing with the LCD display
+ ================================================================================*/
+
 #include <xc.h>
 #include <stdio.h>
-#include "configBits.h"
-#include "constants.h"
-#include "lcd.h"
+#include "main.h"
 
 void initLCD(void) {
     __delay_ms(15);
@@ -40,11 +43,11 @@ void lcdNibble(char data){
 
     E = 0;
     __delay_us(LCD_DELAY);
-    E = 1;    
+    E = 1;
     __delay_us(LCD_DELAY);
-    
+
     data = data << 4;
-    
+
     temp = data & 0xF0;
     LATD = LATD & 0x0F;
     LATD = temp | LATD;
@@ -54,7 +57,3 @@ void lcdNibble(char data){
     E = 1;
     __delay_us(LCD_DELAY);
 }
-
-
-
-

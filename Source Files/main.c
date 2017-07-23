@@ -8,18 +8,15 @@
 
 #include <xc.h>
 #include <stdio.h>
-#include "configBits.h"
-#include "constants.h"
-#include "lcd.h"
-//#include "I2C.h"
+#include "main.h"
 
 //global variables
-const char keys[] = "123A456B789C*0#D";
-unsigned char totalNumOfBottles = 0;
-unsigned char YopNoCap = 0;
-unsigned char YopCap = 0;
-unsigned char EskaCap = 0;
-unsigned char EskaNoCap = 0;
+const char keys[] = "123A456B789C*0#D"; //all of the keys on the Keypad interface
+unsigned char totalNumOfBottles = 0; //variable keeps track of all the bottles sorted
+unsigned char YopNoCap = 0; //variable keeps track of all the Yoplait bottles with no cap sorted
+unsigned char YopCap = 0; //variable keeps track of all Yoplait bottles with a cap sorted
+unsigned char EskaCap = 0; //variable keeps track of all Eska (transparent) bottles with a cap sorted
+unsigned char EskaNoCap = 0; //variable keeps track of all Eska (transparent) bottles without a cap sorted
 const char inputTime[7] = {  0x00, //Second
                             0x49, //Minute
                             0x05, //Hour
@@ -27,11 +24,12 @@ const char inputTime[7] = {  0x00, //Second
                             0x28, //Day
                             0x3, //Month
                             0x17};//Year
-unsigned char time[7];
+unsigned char time[7]; //array to hold information on the current date and time
 unsigned char finalTime[7];
-unsigned char sortTime[2];
-int bins[4] = {0,1,2,3};
-int currentBinPosition = 0;
+unsigned char sortTime[2]; //array to hold the minutes and seconds value of the time required to sort
+int currentBinPosition = 0; //variable to keep track of which bin is underneath the sorting tube
+
+//variables required for the interrupt timer
 int count = 0;
 int totalCount = 0;
 
@@ -45,6 +43,7 @@ void main(void) {
      * RB0,RB2 - cap check - input
      */
 
+	//initialize input and output ports
     TRISA = 0b00000011;  //set RA0,RA1 input, RA4,RA5 output
     TRISC = 0b01000000;   //all output mode except RC6
     TRISD = 0x00;   //All output mode
@@ -57,7 +56,7 @@ void main(void) {
     LATC = 0x00;
     LATD = 0x00;
 
-//    //setting up interrupt timer. Uncomment and execute once to set time on display, then comment out
+//    //setting up Real Time Clock. Uncomment and execute once to set time on display, then comment out
 //    T0CS = 0; //Set timer0 to use internal clock
 //    T0SE = 0; //count on rising edge
 //    PSA = 0;
@@ -81,7 +80,7 @@ void main(void) {
     read_time();
     printf("%02x/%02x/%02x   %02x:%02x", time[6],time[5],time[4],time[2],time[1]); //display time onto the UI display
     __lcd_newline();
-    if(ReadEE(0,0) != 0xFF) {
+    if(ReadEE(0,0) != 0xFF) { //only display this is there is something in permanent memory to display
         printf("A:Logs   D:Start");
         __lcd_newline();
     }
@@ -89,11 +88,11 @@ void main(void) {
         printf("         D:Start");
         __lcd_newline();
     }
-    while(1) {
+    while(1) { //poll the keypad and perform action based on what user presses on keypad
         char key = keypadInterface();
         if (key == 'D') { //press key D on the keypad to start the operation
             read_time(); //sets timer
-            operationMode();
+            operationMode(); //begin sorting
         }
         else if(key == 'A' && ReadEE(0,0) != 0xFF) { //press A to view Saved Logs of previous runs
             viewSavedLogs();
@@ -178,7 +177,7 @@ int bottleIdentifier(void) {
 int rotationAmount(int bottleIdentity) {
 	//this function is used to determine how much to rotate bottom platform based on the identity of bottle
     int counter = 0;
-    while(bins[currentBinPosition] != bottleIdentity) {
+    while(currentBinPosition != bottleIdentity) {
         if(currentBinPosition == 3) {
             currentBinPosition = 0;
         }
@@ -214,19 +213,20 @@ void terminationMode(void) {
     }
     if(key == 'C') {
         unsigned char sortLog[13];
-        sortLog[0] = finalTime[6];
+		//store all of the information from the run into the sortingLog variable
+        sortLog[0] = finalTime[6]; //
         sortLog[1] = finalTime[5];
         sortLog[2] = finalTime[4];
         sortLog[3] = finalTime[3];
         sortLog[4] = finalTime[2];
         sortLog[5] = finalTime[1];
-        sortLog[6] = sortTime[1];
-        sortLog[7] = sortTime[0];
-        sortLog[8] = totalNumOfBottles;
-        sortLog[9] = YopCap;
-        sortLog[10] = YopNoCap;
-        sortLog[11] = EskaCap;
-        sortLog[12] = EskaNoCap;
+        sortLog[6] = sortTime[1]; //minutes of the final sort time
+        sortLog[7] = sortTime[0]; //seconds of the final sort time
+        sortLog[8] = totalNumOfBottles; //total number of bottles sorted
+        sortLog[9] = YopCap; //total number of Yoplait bottles with a cap that has been sorted
+        sortLog[10] = YopNoCap; //total number of Yoplait bottles without a cap that has been sorted
+        sortLog[11] = EskaCap; //total number of Eska (transparent) bottles with a cap that has been sorted
+        sortLog[12] = EskaNoCap; //total number of Eska (transparent) bottles with a cap that has been sorted
         retrieveLog(0,sortLog);
     }
 }
@@ -238,9 +238,9 @@ void retrieveLog(int mode, unsigned char sortLog[]) {
     unsigned char key; //which key is pressed?
     sortingLog(log,sortLog,mode); //function that displays the information on the log
     __delay_halfs();
-    while(1) {
+    while(1) { //while loop is used to allow user to navigate the menu
         if(newlog != log) {
-            sortingLog(newlog,sortLog,mode);
+            sortingLog(newlog,sortLog,mode); //display the appropriate log
         }
         log = newlog;
         key = keypadInterface(); //which key is pressed?
@@ -252,31 +252,6 @@ void retrieveLog(int mode, unsigned char sortLog[]) {
         }
         else if(key == 'C' && newlog == 6) {
             break; //there are only 6 piece of information, so don't do anything if C is pressed
-        }
-    }
-}
-
-void retrieveLog2(int mode, unsigned char sortLog[]) {
-    //if mode == 0, this is the log of the run that has just been completed
-    //if mode == 1, this is the log that has been previously saved
-    int log = 0, newlog = 0;
-    unsigned char key;
-    sortingLog(log,sortLog,mode);
-    __delay_ms(250);
-    while(1) {
-        if(newlog != log) {
-            sortingLog(newlog,sortLog,mode);
-        }
-        log = newlog;
-        key = keypadInterface();
-        if(key == 'C' && newlog < 6) {
-            newlog++;
-        }
-        else if(key == 'B' && newlog > 0) {
-            newlog--;
-        }
-        else if(key == 'C' && newlog == 6) {
-            break;
         }
     }
 }
@@ -331,101 +306,6 @@ void sortingLog(int log, unsigned char sortLog[], int mode) {
     }
 }
 
-unsigned char ReadEE(unsigned char addressh, unsigned char address) {
-	//read data from permanent memory
-    EEADRH = addressh;
-    EEADR = address;
-    EECON1bits.EEPGD = 0;
-    EECON1bits.CFGS = 0;
-    EECON1bits.RD = 1;
-    return EEDATA;
-}
-
-void WriteEE(unsigned char addressh, unsigned char address, unsigned char data) {
-	//write data onto permanent memory so that user can see previous runs
-    EECON1bits.WREN = 1; //enable writes
-    EEADRH = addressh; //upper bits of data address
-    EEADR = address; //lower bits of data address
-    EEDATA = data; //data to be written
-    EECON1bits.EEPGD = 0; //point to DATA memory
-    EECON1bits.CFGS = 0; //access EEPROM
-    INTCONbits.GIE = 0; //disable interrupts
-
-    //required sequence
-    EECON2 = 0x55;
-    EECON2 = 0xAA;
-    EECON1bits.WR = 1; //Set WR bit to begin write
-
-    INTCONbits.GIE = 1; //enable interrupts
-    while (EECON1bits.WR == 1) {} //waiting for write to complete
-    EECON1bits.WREN = 0; //disable writes on write complete
-}
-
-void saveLog(unsigned char sortLog[]) {
-    unsigned int address = 0;
-    unsigned char addressh, addressl;
-    while(ReadEE(((address >> 8) & 0xFF), (address & 0xFF)) != 0xFF) {
-        address += 13;
-    } //look for a byte of memory that is unwritten to
-    __lcd_clear();
-    for(unsigned int i = 0; i < 13; i++) {
-        addressh = (address >> 8) & 0xFF;
-        addressl = address & 0xFF;
-        //debug code
-        __lcd_home();
-        __delay_ms(10);
-        printf("Saving Data... ");
-        __delay_ms(10);
-        WriteEE(addressh,addressl,sortLog[i]);
-        address++;
-    }
-    viewSavedLogs();
-}
-
-void viewSavedLogs(void) {
-    __lcd_clear();
-    __delay_ms(1);
-    printf(" View saved logs");
-    __lcd_newline();
-    printf("          C:Next");
-    char key = keypadInterface();
-    while(key != 'C'){
-        key = keypadInterface();
-    }
-    __lcd_clear();
-    __delay_ms(1);
-    printf(" Press D to");
-    __lcd_newline();
-    printf("select a log");
-    __delay_1s();
-    __delay_1s();
-    unsigned char i = 0;
-    unsigned char sortLog[13];
-    while(1) {
-        for(unsigned char j = 0; j < 13; j++) {
-            sortLog[j] = ReadEE(0,i+j);
-        }
-        __lcd_clear();
-        __delay_ms(1);
-        printf("%02x/%02x/%02x   %02x:%02x", sortLog[0],sortLog[1],sortLog[2],sortLog[4],sortLog[5]);
-        __lcd_newline();
-        printf("B:Prev    C:Next");
-        key = keypadInterface();
-        if(key == 'C') {
-            unsigned char temp = i + 13;
-            if(ReadEE(0,temp) != 0xFF) {
-                i = temp;
-            }
-        }
-        else if(key == 'B' && i > 0) {
-            i -= 13;
-        }
-        else if(key == 'D') {
-            retrieveLog2(1,sortLog);
-        }
-    }
-}
-
 char keypadInterface(void) {
     while(PORTBbits.RB1 == 0){
             // RB1 is the interrupt pin, so if there is no key pressed, RB1 will be 0
@@ -441,143 +321,14 @@ char keypadInterface(void) {
     return temp;
 }
 
-void turnBottomMotor(int angle) {
-	//code used to rotate DC motor and correct bin underneath sorting tube
-    int counter;
-    counter = angle / 90;
-    if(counter == 0) {
-        return;
-    }
-    if(counter > 0) {
-        PORTCbits.RC7 = 1;
-    }
-    while(PORTCbits.RC6 == 0);
-    while(counter > 0) {
-        if(PORTCbits.RC6 == 0) {
-            if(counter == 1) {
-                PORTCbits.RC7 = 0;
-                break;
-            }
-            counter--;
-            __delay_ms(5);
-            while(PORTCbits.RC6 == 0);
-        }
-    }
-}
-
-
-void turnStepperMotor(int angle) {
-	//code used to turn stepper motor, allowing bottle to fall from sorting tube into the bin
-    float factor;
-    float rotation;
-    float temp;
-    temp = angle;
-    factor = temp/360;
-    rotation = fabs(512*factor);
-    unsigned int i = 0;
-    while(i < rotation) {
-        if(angle >= 0) {
-            //execute stepping sequence to rotate clockwise
-            LATA = 0b00110000;
-            __delay_us(1500);
-            LATA = 0b00011000;
-            __delay_us(1500);
-            LATA = 0b00001100;
-            __delay_us(1500);
-            LATA = 0b00100100;
-            __delay_us(1500);
-        }
-        else {
-            //execute stepping sequence to rotate counterclockwise
-            LATA = 0b00100100;
-            __delay_us(1500);
-            LATA = 0b00001100;
-            __delay_us(1500);
-            LATA = 0b00011000;
-            __delay_us(1500);
-            LATA = 0b00110000;
-            __delay_us(1500);
-        }
-        i++;
-    }
-}
-
-void set_time(void){
-    I2C_Master_Start(); //Start condition
-    I2C_Master_Write(0b11010000); //7 bit RTC address + Write
-    I2C_Master_Write(0x00); //Set memory pointer to seconds
-    for(char i=0; i<7; i++){
-        I2C_Master_Write(inputTime[i]);
-    }
-    I2C_Master_Stop(); //Stop condition
-}
-
-void read_time(void) {
-    //Reset RTC memory pointer
-    I2C_Master_Start(); //Start condition
-    I2C_Master_Write(0b11010000); //7 bit RTC address + Write
-    I2C_Master_Write(0x00); //Set memory pointer to seconds
-    I2C_Master_Stop(); //Stop condition
-
-    //Read Current Time
-    I2C_Master_Start();
-    I2C_Master_Write(0b11010001); //7 bit RTC address + Read
-    for(unsigned char i=0;i<0x06;i++){
-        time[i] = I2C_Master_Read(1);
-    }
-    time[6] = I2C_Master_Read(0);       //Final Read without ack
-    I2C_Master_Stop();
-}
-
-void set_final_time(void) {
-    //Reset RTC memory pointer
-    I2C_Master_Start(); //Start condition
-    I2C_Master_Write(0b11010000); //7 bit RTC address + Write
-    I2C_Master_Write(0x00); //Set memory pointer to seconds
-    I2C_Master_Stop(); //Stop condition
-
-    //Read Current Time
-    I2C_Master_Start();
-    I2C_Master_Write(0b11010001); //7 bit RTC address + Read
-    for(unsigned char i=0;i<0x06;i++){
-        finalTime[i] = I2C_Master_Read(1);
-    }
-    finalTime[6] = I2C_Master_Read(0);       //Final Read without ack
-    I2C_Master_Stop();
-
-    calcSortTime();
-}
-
-void calcSortTime(void) {
-    unsigned char initialMinutes, finalMinutes;
-    unsigned char initialSeconds, finalSeconds;
-
-	//time stored in the Real Time CLock (RTC Module) is in BCD. Need to convert to decimal first
-    finalMinutes = (finalTime[1] >> 4)*10 + (finalTime[1] & 0x0F); //convert BCD to decimal number
-    finalSeconds = (finalTime[0] >> 4)*10 + (finalTime[0] & 0x0F); //convert BCD to decimal number
-
-    initialMinutes = (time[1] >> 4)*10 + (time[1] & 0x0F); //convert BCD to decimal number
-    initialSeconds = (time[0] >> 4)*10 + (time[0] & 0x0F); //convert BCD to decimal number
-
-    if(finalSeconds < initialSeconds) { //in this case, borrow 1 from the minutes and add 60 to seconds
-        finalMinutes = finalMinutes - 1;
-        finalSeconds = finalSeconds + 60;
-        sortTime[0] = finalSeconds - initialSeconds;
-        sortTime[1] = finalMinutes - initialMinutes;
-    }
-    else { //else just subtract minutes and seconds
-        sortTime[0] = finalSeconds - initialSeconds;
-        sortTime[1] = finalMinutes - initialMinutes;
-    }
-}
-
+//this interrupt is used to terminate operation of the robot after 3 minutes
 void interrupt IRQ_HANDLER(void) {
     if(TMR0IF) { //timer interrupt flag
         TMR0 = 0; //reset TIMER0 register after overflowing
         count++; //increase count value
         if(count == 687) { //count value of 687, corresponding to 3 minutes
             di();
-            set_final_time();
+            set_final_time(finalTime, sortTime);
             terminationMode();
         }
         TMR0IF = 0; //clear interrupt flag
