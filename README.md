@@ -26,7 +26,7 @@ The frame of the robot was mostly made of scrap pieces of wood and aluminum beam
 
 Above is an image of the robot. The three coloured brackets in the picture represent the three main components of the robot. The green bracket shows the loading area.
 
-![](/Images/loading.png)
+![](/Images/Loading.png)
 
 Bottles are loaded in this area. When the user presses the start button, a DC motor is activated which rotates the platform and brings the bottles one by one onto the sorting tube.
 
